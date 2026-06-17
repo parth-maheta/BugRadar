@@ -1,0 +1,38 @@
+{
+  "name": "bugradar",
+  "displayName": "BugRadar",
+  "description": "Detects bugs while you type using rule-based and AI-powered analysis.",
+  "version": "0.1.0",
+  "publisher": "bugradar",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:javascript"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {},
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "copy-wasm": "node scripts/copyWasm.js",
+    "compile": "npm run copy-wasm && tsc -p ./",
+    "watch": "npm run copy-wasm && tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/emscripten": "^1.39.12",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "eslint": "^8.56.0",
+    "tree-sitter-wasms": "^0.1.13",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.22.6"
+  }
+}
