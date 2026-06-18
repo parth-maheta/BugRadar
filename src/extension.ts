@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { DiagnosticManager } from "./diagnostics/diagnosticManager";
 import { ParserManager } from "./parser/parserManager";
+import { runRules } from "./rules/ruleEngine";
+import { Issue, IssueSeverity } from "./types/issue";
 
 /** Languages that BugRadar supports. */
 const SUPPORTED_LANGUAGES = new Set(["python", "javascript"]);
@@ -73,28 +75,57 @@ export function deactivate(): void {
 }
 
 /**
+ * Maps IssueSeverity enum values to human-readable labels for console output.
+ */
+function severityLabel(severity: IssueSeverity): string {
+  switch (severity) {
+    case IssueSeverity.Error:
+      return "error";
+    case IssueSeverity.Warning:
+      return "warning";
+    case IssueSeverity.Information:
+      return "info";
+    case IssueSeverity.Hint:
+      return "hint";
+    default:
+      return "unknown";
+  }
+}
+
+/**
  * Entry point for analyzing a single document.
- * Parses the document into an AST and logs the root node type.
- * Rule execution will be added in Milestone 3.
+ * Parses the document into an AST, runs the rule engine for the
+ * document's language, and logs detected issues to the Debug Console.
  */
 function analyzeDocument(document: vscode.TextDocument): void {
   if (!SUPPORTED_LANGUAGES.has(document.languageId)) {
     return;
   }
 
-  // --- Milestone 2: Parse document and log the AST root node type ---
   const tree = parserManager.parse(document);
-  if (tree) {
-    console.log(
-      `BugRadar [${document.languageId}]: root node type = "${tree.rootNode.type}" ` +
-        `(${tree.rootNode.namedChildCount} top-level nodes)`
-    );
-    // The tree will be passed to rule engines in Milestone 3.
-    // For now, free it after logging.
+  if (!tree) {
+    return;
+  }
+
+  let issues: Issue[];
+  try {
+    issues = runRules(tree, document.languageId);
+  } finally {
     tree.delete();
   }
 
-  // Milestone 1: no rules yet — emit an empty diagnostic set.
-  // This proves the pipeline works end-to-end without showing false results.
+  // --- Log issues to the Debug Console ---
+  if (issues.length > 0) {
+    console.log(
+      `BugRadar: ${issues.length} issue${issues.length === 1 ? "" : "s"} found`
+    );
+    for (const issue of issues) {
+      console.log(`[${severityLabel(issue.severity)}] ${issue.message}`);
+    }
+  } else {
+    console.log("BugRadar: 0 issues found");
+  }
+
+  // Diagnostics rendering will be wired up in a future milestone.
   diagnosticManager.updateDiagnostics(document.uri, []);
 }
