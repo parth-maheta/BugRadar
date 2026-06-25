@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { DiagnosticManager } from "./diagnostics/diagnosticManager";
 import { ParserManager } from "./parser/parserManager";
 import { runRules } from "./rules/ruleEngine";
-import { Issue, IssueSeverity } from "./types/issue";
 
 /** Languages that BugRadar supports. */
 const SUPPORTED_LANGUAGES = new Set(["python", "javascript"]);
@@ -75,57 +74,32 @@ export function deactivate(): void {
 }
 
 /**
- * Maps IssueSeverity enum values to human-readable labels for console output.
- */
-function severityLabel(severity: IssueSeverity): string {
-  switch (severity) {
-    case IssueSeverity.Error:
-      return "error";
-    case IssueSeverity.Warning:
-      return "warning";
-    case IssueSeverity.Information:
-      return "info";
-    case IssueSeverity.Hint:
-      return "hint";
-    default:
-      return "unknown";
-  }
-}
-
-/**
  * Entry point for analyzing a single document.
  * Parses the document into an AST, runs the rule engine for the
- * document's language, and logs detected issues to the Debug Console.
+ * document's language, and passes detected issues to the
+ * DiagnosticManager for rendering in the editor.
  */
 function analyzeDocument(document: vscode.TextDocument): void {
+  // Unsupported languages: clear any stale diagnostics and bail out.
   if (!SUPPORTED_LANGUAGES.has(document.languageId)) {
+    diagnosticManager.clearDiagnostics(document.uri);
     return;
   }
 
   const tree = parserManager.parse(document);
   if (!tree) {
+    // Parser not ready — clear diagnostics so we don't show stale data.
+    diagnosticManager.updateDiagnostics(document, []);
     return;
   }
 
-  let issues: Issue[];
+  let issues;
   try {
     issues = runRules(tree, document.languageId);
   } finally {
     tree.delete();
   }
 
-  // --- Log issues to the Debug Console ---
-  if (issues.length > 0) {
-    console.log(
-      `BugRadar: ${issues.length} issue${issues.length === 1 ? "" : "s"} found`
-    );
-    for (const issue of issues) {
-      console.log(`[${severityLabel(issue.severity)}] ${issue.message}`);
-    }
-  } else {
-    console.log("BugRadar: 0 issues found");
-  }
-
-  // Diagnostics rendering will be wired up in a future milestone.
-  diagnosticManager.updateDiagnostics(document.uri, []);
+  // Push issues into the VS Code Diagnostics API.
+  diagnosticManager.updateDiagnostics(document, issues);
 }
